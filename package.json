@@ -1,0 +1,14 @@
+{
+  "name": "ecs-service-manage",
+  "version": "1.0.0",
+  "description": "Web panel for managing services on an Ubuntu ECS via SSH",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "ssh2": "^1.17.0"
+  }
+}
