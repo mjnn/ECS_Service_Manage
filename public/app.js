@@ -3,6 +3,10 @@ const dockerTableBody = document.getElementById("dockerTableBody");
 const proxyMappingBody = document.getElementById("proxyMappingBody");
 const linksTableBody = document.getElementById("linksTableBody");
 const copyAllLinksBtn = document.getElementById("copyAllLinksBtn");
+const sshCommandForm = document.getElementById("sshCommandForm");
+const sshCommandInput = document.getElementById("sshCommandInput");
+const sshExecuteBtn = document.getElementById("sshExecuteBtn");
+const sshClearBtn = document.getElementById("sshClearBtn");
 const refreshBtn = document.getElementById("refreshBtn");
 const logoutBtn = document.getElementById("logoutBtn");
 const saveProxyMappingsBtn = document.getElementById("saveProxyMappingsBtn");
@@ -199,6 +203,7 @@ function setBusy(isBusy) {
   saveProxyMappingsBtn.disabled = isBusy || !authToken;
   applyProxyMappingsBtn.disabled = isBusy || !authToken;
   copyAllLinksBtn.disabled = isBusy || !authToken;
+  sshExecuteBtn.disabled = isBusy || !authToken;
 }
 
 function beginRequest() {
@@ -269,6 +274,39 @@ async function requestJson(url, options = {}) {
   }
 
   return data;
+}
+
+async function executeSshCommand() {
+  const command = sshCommandInput.value.trim();
+  if (!command) {
+    setLog("请输入要执行的 SSH 指令");
+    return;
+  }
+
+  beginRequest();
+  try {
+    setLog(`正在执行 SSH 指令...\n$ ${command}`);
+    const result = await requestJson(apiUrl("/api/ssh/exec"), {
+      method: "POST",
+      body: JSON.stringify({ command })
+    });
+
+    const lines = [
+      `$ ${result.command}`,
+      `exitCode: ${result.exitCode}`,
+      "",
+      "stdout:",
+      result.stdout || "(empty)",
+      "",
+      "stderr:",
+      result.stderr || "(empty)"
+    ];
+    setLog(lines.join("\n"));
+  } catch (error) {
+    setLog(`SSH 执行失败: ${error.message}`);
+  } finally {
+    endRequest();
+  }
 }
 
 async function runAction(serviceName, action) {
@@ -767,6 +805,32 @@ copyAllLinksBtn.addEventListener("click", async () => {
     setLog(`已复制 ${exposureLinks.length} 条链接`);
   }
 });
+
+sshCommandForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await executeSshCommand();
+});
+
+sshClearBtn.addEventListener("click", () => {
+  sshCommandInput.value = "";
+  sshCommandInput.focus();
+});
+
+sshCommandInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault();
+    sshCommandForm.requestSubmit();
+  }
+});
+
+document.querySelectorAll(".ssh-quick-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    sshCommandInput.value = btn.dataset.cmd || "";
+    sshCommandInput.focus();
+    switchTab("sshTab");
+  });
+});
+
 fillEcsProxyExampleBtn.addEventListener("click", () => {
   mapContainerName.value = "ecs-service-manage";
   mapHost.value = "47.116.180.173";

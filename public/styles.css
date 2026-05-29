@@ -200,6 +200,59 @@ button:disabled {
   color: #166534;
 }
 
+.ssh-console {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ssh-input {
+  width: 100%;
+  min-height: 140px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 12px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+  background: #ffffff;
+  color: #111827;
+}
+
+.ssh-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.ssh-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ssh-actions button {
+  margin-right: 0;
+}
+
+.ssh-quick-cmds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.ssh-quick-label {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.ssh-quick-btn {
+  margin-right: 0;
+}
+
 .monitor-panel {
   position: fixed;
   right: 16px;
@@ -314,11 +367,6 @@ button:disabled {
     grid-template-columns: 1fr 1fr;
   }
 
-  .tabs .tab-btn:nth-child(3),
-  .tabs .tab-btn:nth-child(4) {
-    grid-column: span 1;
-  }
-
   table,
   thead,
   tbody,
@@ -363,6 +411,14 @@ button:disabled {
 
   .actions button {
     flex: 1 1 calc(50% - 8px);
+  }
+
+  .ssh-actions button {
+    flex: 1 1 calc(50% - 8px);
+  }
+
+  .ssh-quick-cmds {
+    gap: 6px;
   }
 
   .monitor-panel {

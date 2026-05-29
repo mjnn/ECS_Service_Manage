@@ -39,6 +39,7 @@
         <button class="tab-btn active" data-tab="servicesTab">Systemd</button>
         <button class="tab-btn" data-tab="dockerTab">Docker</button>
         <button class="tab-btn" data-tab="linksTab">对外链接</button>
+        <button class="tab-btn" data-tab="sshTab">SSH 指令</button>
         <button class="tab-btn" data-tab="proxyConfigTab">Nginx 代理</button>
       </nav>
 
@@ -93,6 +94,31 @@
             </thead>
             <tbody id="linksTableBody"></tbody>
           </table>
+        </div>
+      </section>
+
+      <section id="sshTab" class="tab-panel">
+        <h2>SSH 指令</h2>
+        <p class="hint">在 ECS 上执行 Shell 命令，结果输出到下方日志监视器。支持 Ctrl+Enter 快捷执行。</p>
+        <form id="sshCommandForm" class="ssh-console">
+          <textarea
+            id="sshCommandInput"
+            class="ssh-input"
+            rows="6"
+            placeholder="例如：docker ps -a&#10;df -h&#10;systemctl status nginx --no-pager"
+            spellcheck="false"
+          ></textarea>
+          <div class="ssh-actions">
+            <button type="submit" id="sshExecuteBtn">执行</button>
+            <button type="button" id="sshClearBtn" class="secondary-btn">清空</button>
+          </div>
+        </form>
+        <div class="ssh-quick-cmds">
+          <span class="ssh-quick-label">快捷指令：</span>
+          <button type="button" class="secondary-btn ssh-quick-btn" data-cmd="docker ps -a">docker ps</button>
+          <button type="button" class="secondary-btn ssh-quick-btn" data-cmd="df -h">磁盘</button>
+          <button type="button" class="secondary-btn ssh-quick-btn" data-cmd="free -h">内存</button>
+          <button type="button" class="secondary-btn ssh-quick-btn" data-cmd="uptime">负载</button>
         </div>
       </section>
 

@@ -148,6 +148,23 @@ function buildProxyAccessUrl(mapping, serverIp) {
   return `${scheme}://${hostLabel}${path}`;
 }
 
+function validateSshCommand(command) {
+  if (!command || typeof command !== "string") {
+    return "Command is required";
+  }
+  const trimmed = command.trim();
+  if (!trimmed) {
+    return "Command is required";
+  }
+  if (trimmed.length > 4000) {
+    return "Command too long";
+  }
+  if (trimmed.includes("\0")) {
+    return "Invalid command";
+  }
+  return null;
+}
+
 async function readProxyMappings() {
   const result = await runSshCommand(
     `if [ -f ${proxyMappingsFile} ]; then cat ${proxyMappingsFile}; else echo '[]'; fi`
@@ -518,6 +535,31 @@ app.get("/api/docker/containers", async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: "Failed to load docker containers",
+      error: formatAuthError(error)
+    });
+  }
+});
+
+app.post("/api/ssh/exec", async (req, res) => {
+  const command = req.body?.command;
+  const validationError = validateSshCommand(command);
+  if (validationError) {
+    res.status(400).json({ message: validationError });
+    return;
+  }
+
+  const trimmedCommand = command.trim();
+  try {
+    const result = await runSshCommand(trimmedCommand);
+    res.json({
+      command: trimmedCommand,
+      exitCode: result.code,
+      stdout: result.stdout,
+      stderr: result.stderr
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "SSH command failed",
       error: formatAuthError(error)
     });
   }
