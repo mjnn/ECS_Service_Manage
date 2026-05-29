@@ -33,11 +33,12 @@
         <p id="authMessage" class="auth-message"></p>
       </section>
 
-      <p class="hint">通过两个 Tab 完成日常运维：服务管理（Systemd + Docker）与代理配置（Nginx）。</p>
+      <p class="hint">通过 Tab 完成日常运维：服务管理、对外链接复制、代理配置等。</p>
 
       <nav class="tabs" id="tabsNav">
         <button class="tab-btn active" data-tab="servicesTab">Systemd</button>
         <button class="tab-btn" data-tab="dockerTab">Docker</button>
+        <button class="tab-btn" data-tab="linksTab">对外链接</button>
         <button class="tab-btn" data-tab="proxyConfigTab">Nginx 代理</button>
       </nav>
 
@@ -70,6 +71,27 @@
               </tr>
             </thead>
             <tbody id="dockerTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="linksTab" class="tab-panel">
+        <h2>对外服务链接</h2>
+        <p class="hint">汇总 Nginx 反代、Docker 端口映射与公网监听端口，点击即可复制访问地址。</p>
+        <div class="links-toolbar">
+          <button id="copyAllLinksBtn" class="secondary-btn" type="button">复制全部链接</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>来源</th>
+                <th>说明</th>
+                <th>访问链接</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="linksTableBody"></tbody>
           </table>
         </div>
       </section>

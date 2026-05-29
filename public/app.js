@@ -1,6 +1,8 @@
 const tableBody = document.getElementById("serviceTableBody");
 const dockerTableBody = document.getElementById("dockerTableBody");
 const proxyMappingBody = document.getElementById("proxyMappingBody");
+const linksTableBody = document.getElementById("linksTableBody");
+const copyAllLinksBtn = document.getElementById("copyAllLinksBtn");
 const refreshBtn = document.getElementById("refreshBtn");
 const logoutBtn = document.getElementById("logoutBtn");
 const saveProxyMappingsBtn = document.getElementById("saveProxyMappingsBtn");
@@ -28,6 +30,7 @@ const authMessage = document.getElementById("authMessage");
 let pendingRequestCount = 0;
 let authToken = localStorage.getItem("panelAuthToken") || "";
 let proxyMappings = [];
+let exposureLinks = [];
 const monitorLayoutKey = "monitorLayoutV1";
 const appBasePath = (() => {
   const pathname = window.location.pathname || "/";
@@ -195,6 +198,7 @@ function setBusy(isBusy) {
   logoutBtn.disabled = isBusy;
   saveProxyMappingsBtn.disabled = isBusy || !authToken;
   applyProxyMappingsBtn.disabled = isBusy || !authToken;
+  copyAllLinksBtn.disabled = isBusy || !authToken;
 }
 
 function beginRequest() {
@@ -300,6 +304,140 @@ function createActionButton(label, handler) {
   btn.textContent = label;
   btn.addEventListener("click", handler);
   return btn;
+}
+
+function formatPublicUrl(host, port) {
+  const scheme = port === 443 ? "https" : "http";
+  if ((scheme === "http" && port === 80) || (scheme === "https" && port === 443)) {
+    return `${scheme}://${host}`;
+  }
+  return `${scheme}://${host}:${port}`;
+}
+
+function buildExposureLinks(data) {
+  const links = [];
+  const serverIp = data.serverIp || "";
+
+  (data.reverseProxyUrls || []).forEach((rule) => {
+    if (!rule.url) return;
+    links.push({
+      source: "Nginx 反代",
+      label: `${rule.host}${rule.location}`,
+      url: rule.url
+    });
+  });
+
+  (data.dockerPublished || []).forEach((container) => {
+    (container.mappings || []).forEach((mapping) => {
+      links.push({
+        source: "Docker 端口",
+        label: `${container.name} (${mapping.hostPort}→${mapping.containerPort}/${mapping.proto})`,
+        url: formatPublicUrl(serverIp, mapping.hostPort)
+      });
+    });
+  });
+
+  (data.publicServices || []).forEach((socket) => {
+    links.push({
+      source: "公网监听",
+      label: `:${socket.port} ${socket.process || ""}`.trim(),
+      url: formatPublicUrl(serverIp, socket.port)
+    });
+  });
+
+  const seen = new Set();
+  return links.filter((item) => {
+    const key = `${item.source}|${item.url}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function copyText(text) {
+  if (!text) return false;
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (error) {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copied = document.execCommand("copy");
+    document.body.removeChild(textarea);
+    return copied;
+  }
+}
+
+function flashCopyButton(button, successText = "已复制") {
+  const originalText = button.textContent;
+  button.textContent = successText;
+  button.classList.add("copied");
+  window.setTimeout(() => {
+    button.textContent = originalText;
+    button.classList.remove("copied");
+  }, 1200);
+}
+
+function createCopyButton(url) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "copy-btn";
+  btn.textContent = "复制";
+  btn.addEventListener("click", async () => {
+    const copied = await copyText(url);
+    flashCopyButton(btn, copied ? "已复制" : "失败");
+    if (copied) {
+      setLog(`已复制链接: ${url}`);
+    }
+  });
+  return btn;
+}
+
+function renderExposureLinks(links) {
+  exposureLinks = links;
+  linksTableBody.innerHTML = "";
+
+  if (!links.length) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = "<td colspan='4'>暂无对外服务链接</td>";
+    linksTableBody.appendChild(tr);
+    return;
+  }
+
+  links.forEach((item) => {
+    const tr = document.createElement("tr");
+
+    const sourceTd = document.createElement("td");
+    sourceTd.textContent = item.source;
+    sourceTd.dataset.label = "来源";
+
+    const labelTd = document.createElement("td");
+    labelTd.textContent = item.label;
+    labelTd.dataset.label = "说明";
+
+    const urlTd = document.createElement("td");
+    urlTd.dataset.label = "访问链接";
+    const linkEl = document.createElement("span");
+    linkEl.className = "link-url";
+    linkEl.textContent = item.url;
+    urlTd.appendChild(linkEl);
+
+    const actionTd = document.createElement("td");
+    actionTd.dataset.label = "操作";
+    actionTd.className = "actions";
+    actionTd.appendChild(createCopyButton(item.url));
+
+    tr.appendChild(sourceTd);
+    tr.appendChild(labelTd);
+    tr.appendChild(urlTd);
+    tr.appendChild(actionTd);
+    linksTableBody.appendChild(tr);
+  });
 }
 
 function createProxyDeleteButton(index) {
@@ -508,6 +646,16 @@ async function loadProxyMappings() {
   }
 }
 
+async function loadExposureLinks() {
+  try {
+    const data = await requestJson(apiUrl("/api/exposure/summary"));
+    renderExposureLinks(buildExposureLinks(data));
+  } catch (error) {
+    setLog(`加载对外链接失败: ${error.message}`);
+    renderExposureLinks([]);
+  }
+}
+
 async function saveProxyMappings() {
   beginRequest();
   try {
@@ -545,6 +693,7 @@ async function loadAll() {
     await Promise.all([
       loadServices(),
       loadDockerContainers(),
+      loadExposureLinks(),
       loadProxyMappings()
     ]);
   } finally {
@@ -572,7 +721,9 @@ logoutBtn.addEventListener("click", () => {
   saveAuthToken("");
   tableBody.innerHTML = "";
   dockerTableBody.innerHTML = "";
+  linksTableBody.innerHTML = "";
   proxyMappingBody.innerHTML = "";
+  exposureLinks = [];
   setLog("已退出登录");
 });
 
@@ -612,6 +763,18 @@ proxyMappingForm.addEventListener("submit", (event) => {
 
 saveProxyMappingsBtn.addEventListener("click", saveProxyMappings);
 applyProxyMappingsBtn.addEventListener("click", applyProxyMappings);
+copyAllLinksBtn.addEventListener("click", async () => {
+  if (!exposureLinks.length) {
+    setLog("暂无可复制的对外链接");
+    return;
+  }
+  const text = exposureLinks.map((item) => item.url).join("\n");
+  const copied = await copyText(text);
+  flashCopyButton(copyAllLinksBtn, copied ? "已复制全部" : "复制失败");
+  if (copied) {
+    setLog(`已复制 ${exposureLinks.length} 条链接`);
+  }
+});
 fillEcsProxyExampleBtn.addEventListener("click", () => {
   mapContainerName.value = "ecs-service-manage";
   mapHost.value = "47.116.180.173";
