@@ -306,20 +306,30 @@ function createActionButton(label, handler) {
   return btn;
 }
 
-function formatPublicUrl(host, port) {
-  const scheme = port === 443 ? "https" : "http";
-  if ((scheme === "http" && port === 80) || (scheme === "https" && port === 443)) {
-    return `${scheme}://${host}`;
+function urlExposesPort(url) {
+  if (!url) return true;
+  try {
+    const parsed = new URL(url);
+    return Boolean(parsed.port);
+  } catch (error) {
+    return /:\d+(?:\/|$)/.test(url);
   }
-  return `${scheme}://${host}:${port}`;
 }
 
 function buildExposureLinks(data) {
   const links = [];
-  const serverIp = data.serverIp || "";
+
+  (data.proxyAccessUrls || []).forEach((item) => {
+    if (!item.url || urlExposesPort(item.url)) return;
+    links.push({
+      source: "代理路径",
+      label: `${item.containerName} ${item.path}`,
+      url: item.url
+    });
+  });
 
   (data.reverseProxyUrls || []).forEach((rule) => {
-    if (!rule.url) return;
+    if (!rule.url || urlExposesPort(rule.url)) return;
     links.push({
       source: "Nginx 反代",
       label: `${rule.host}${rule.location}`,
@@ -327,27 +337,9 @@ function buildExposureLinks(data) {
     });
   });
 
-  (data.dockerPublished || []).forEach((container) => {
-    (container.mappings || []).forEach((mapping) => {
-      links.push({
-        source: "Docker 端口",
-        label: `${container.name} (${mapping.hostPort}→${mapping.containerPort}/${mapping.proto})`,
-        url: formatPublicUrl(serverIp, mapping.hostPort)
-      });
-    });
-  });
-
-  (data.publicServices || []).forEach((socket) => {
-    links.push({
-      source: "公网监听",
-      label: `:${socket.port} ${socket.process || ""}`.trim(),
-      url: formatPublicUrl(serverIp, socket.port)
-    });
-  });
-
   const seen = new Set();
   return links.filter((item) => {
-    const key = `${item.source}|${item.url}`;
+    const key = item.url;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

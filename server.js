@@ -133,6 +133,21 @@ function normalizeProxyMapping(mapping) {
   };
 }
 
+function buildProxyAccessUrl(mapping, serverIp) {
+  const host = mapping.host || serverIp;
+  const hostLabel = host === "_" ? serverIp : host;
+  const listenPort = Number(mapping.listenPort || 80);
+  const scheme = listenPort === 443 ? "https" : "http";
+  let path = mapping.path || "/";
+  if (!path.startsWith("/")) {
+    path = `/${path}`;
+  }
+  if (path === "/") {
+    return `${scheme}://${hostLabel}/`;
+  }
+  return `${scheme}://${hostLabel}${path}`;
+}
+
 async function readProxyMappings() {
   const result = await runSshCommand(
     `if [ -f ${proxyMappingsFile} ]; then cat ${proxyMappingsFile}; else echo '[]'; fi`
@@ -577,12 +592,14 @@ app.get("/api/docker/containers/:containerName/logs", async (req, res) => {
 
 app.get("/api/exposure/summary", async (req, res) => {
   try {
-    const [ssResult, dockerResult, nginxResult] = await Promise.all([
+    const [ssResult, dockerResult, nginxResult, mappings] = await Promise.all([
       runSshCommand("ss -lntpH || true"),
       runSshCommand("docker ps --format '{{json .}}' || true"),
-      runSshCommand("nginx -T 2>/dev/null || true")
+      runSshCommand("nginx -T 2>/dev/null || true"),
+      readProxyMappings()
     ]);
 
+    const serverIp = process.env.SSH_HOST;
     const sockets = parseListeningSockets(ssResult.stdout)
       .filter((item) => item.isPublic)
       .sort((a, b) => a.port - b.port);
@@ -591,14 +608,22 @@ app.get("/api/exposure/summary", async (req, res) => {
     );
     const proxyRules = parseNginxProxyRules(nginxResult.stdout).map((rule) => ({
       ...rule,
-      url: rule.url.replace("<server_ip>", process.env.SSH_HOST)
+      url: rule.url.replace("<server_ip>", serverIp)
+    }));
+    const proxyAccessUrls = mappings.map((mapping) => ({
+      containerName: mapping.containerName,
+      host: mapping.host,
+      path: mapping.path,
+      listenPort: Number(mapping.listenPort || 80),
+      url: buildProxyAccessUrl(mapping, serverIp)
     }));
 
     res.json({
-      serverIp: process.env.SSH_HOST,
+      serverIp,
       publicServices: sockets,
       dockerPublished: dockerMappings,
-      reverseProxyUrls: proxyRules
+      reverseProxyUrls: proxyRules,
+      proxyAccessUrls
     });
   } catch (error) {
     res.status(500).json({
